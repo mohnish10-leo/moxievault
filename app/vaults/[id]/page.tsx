@@ -39,6 +39,7 @@ export default function VaultDetailPage() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewTitle, setPreviewTitle] = useState<string | null>(null);
   const [reordering, setReordering] = useState(false);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
 
   const totalBytes = useMemo(
     () => files.reduce((acc, file) => acc + (file.size_bytes || 0), 0),
@@ -225,6 +226,21 @@ export default function VaultDetailPage() {
     await refreshFiles();
   };
 
+  const persistOrder = async (nextFiles: VaultFile[]) => {
+    setReordering(true);
+    const updateResults = await Promise.all(
+      nextFiles.map((file, idx) =>
+        supabase.from("vault_files").update({ sort_index: idx }).eq("id", file.id)
+      )
+    );
+    const firstError = updateResults.find((r) => r.error)?.error;
+    if (firstError) {
+      setMessage(firstError.message);
+      await refreshFiles();
+    }
+    setReordering(false);
+  };
+
   const handleMove = async (fileId: string, direction: "up" | "down") => {
     if (reordering) return;
     const index = files.findIndex((f) => f.id === fileId);
@@ -236,19 +252,29 @@ export default function VaultDetailPage() {
     const [moved] = updated.splice(index, 1);
     updated.splice(newIndex, 0, moved);
     setFiles(updated);
+    await persistOrder(updated);
+  };
 
-    setReordering(true);
-    const updateResults = await Promise.all(
-      updated.map((file, idx) =>
-        supabase.from("vault_files").update({ sort_index: idx }).eq("id", file.id)
-      )
-    );
-    const firstError = updateResults.find((r) => r.error)?.error;
-    if (firstError) {
-      setMessage(firstError.message);
-      await refreshFiles();
-    }
-    setReordering(false);
+  const handleDragStart = (fileId: string) => {
+    setDraggingId(fileId);
+  };
+
+  const handleDragOver = (event: React.DragEvent) => {
+    event.preventDefault();
+  };
+
+  const handleDrop = async (targetId: string) => {
+    if (!draggingId || draggingId === targetId || reordering) return;
+    const fromIndex = files.findIndex((f) => f.id === draggingId);
+    const toIndex = files.findIndex((f) => f.id === targetId);
+    if (fromIndex === -1 || toIndex === -1) return;
+
+    const updated = [...files];
+    const [moved] = updated.splice(fromIndex, 1);
+    updated.splice(toIndex, 0, moved);
+    setFiles(updated);
+    setDraggingId(null);
+    await persistOrder(updated);
   };
 
   const handleDownload = async (fileId: string) => {
@@ -436,14 +462,29 @@ export default function VaultDetailPage() {
                   {files.map((file, index) => (
                     <div
                       key={file.id}
-                      className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2"
+                      draggable={isOwner}
+                      onDragStart={() => handleDragStart(file.id)}
+                      onDragOver={handleDragOver}
+                      onDrop={() => handleDrop(file.id)}
+                      className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border px-3 py-2 transition ${
+                        draggingId === file.id
+                          ? "border-white/40 bg-white/10"
+                          : "border-white/10 bg-white/5 hover:border-white/30"
+                      }`}
                     >
-                      <div>
+                      <div className="flex items-center gap-3">
+                        {isOwner && (
+                          <div className="hidden sm:flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 text-white/60">
+                            ⋮⋮
+                          </div>
+                        )}
+                        <div>
                         <div className="text-sm text-white/90">
                           {file.original_name ?? "Untitled"}
                         </div>
                         <div className="text-xs text-white/50">
                           {(file.size_bytes / (1024 * 1024)).toFixed(2)} MB
+                        </div>
                         </div>
                       </div>
                       <div className="flex flex-wrap items-center gap-2 text-xs text-white/70">
