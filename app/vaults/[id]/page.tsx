@@ -466,7 +466,7 @@ export default function VaultDetailPage() {
                       onDragStart={() => handleDragStart(file.id)}
                       onDragOver={handleDragOver}
                       onDrop={() => handleDrop(file.id)}
-                      className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border px-3 py-2 transition ${
+                      className={`group flex flex-wrap items-center justify-between gap-3 rounded-xl border px-3 py-2 transition ${
                         draggingId === file.id
                           ? "border-white/40 bg-white/10"
                           : "border-white/10 bg-white/5 hover:border-white/30"
@@ -474,7 +474,7 @@ export default function VaultDetailPage() {
                     >
                       <div className="flex items-center gap-3">
                         {isOwner && (
-                          <div className="hidden sm:flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 text-white/60">
+                          <div className="hidden sm:flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 text-white/60 transition group-hover:scale-105 group-hover:border-white/30">
                             ⋮⋮
                           </div>
                         )}
